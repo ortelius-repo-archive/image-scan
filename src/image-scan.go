@@ -9,43 +9,41 @@ import (
 	"github.com/docker/docker/client"
 )
 
+func ImageScanWithCustomCommands(client *client.Client, imagename string, containername string, port string, inputEnv []string, commands []string) error {
 
-func main() {
-	client, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	//---------- Start container -------------
+	containerId, err := functions.RunContainer(client, imagename, containername, port, inputEnv)
+
 	if err != nil {
-		log.Fatalf("Unable to create docker client: %s", err)
-	}
-
-	dockerfile := "C:/Users/utkar/git/ortelius-ms-textfile-crud/Dockerfile"
-	dependentFileNames := []string{"requirements.txt", "main.py"}
-	excCustomCommands := "\nRUN pip3 freeze > requirements.txt; pip3 install cyclonedx-bom==0.4.3 safety 2>/dev/null 1>/dev/null; cyclonedx-py -j -o /tmp/sbom.json; safety check -r requirements.txt --json --output /tmp/cve.json || true;"
-
-	ImageScan(client, dockerfile, dependentFileNames, excCustomCommands)
-}
-
-func ImageScan(client *client.Client, dockerfile string, dependentFileNames []string, excCustomCommands string) error {
-	
-	imagename := "go-check"
-	tags := []string{imagename}
-	
-	err := functions.BuildImage(client, tags, dockerfile, dependentFileNames, excCustomCommands)
-	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return err
 	}
-	
-	containername := imagename
-	portopening := "8080"
-	inputEnv := []string{fmt.Sprintf("LISTENINGPORT=%s", portopening)}
-	
-	err = functions.RunContainer(client, imagename, containername, portopening, inputEnv)
-	if err != nil {
-		log.Println(err)
-	}
 
-	err = functions.RemoveBuildImage(client, imagename)
+	//---------- Execute commands inside container -------------
+	err = functions.ExecCommand(client, containerId, commands)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
+		return err
 	}
 	return nil
+}
+
+func main() {
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		log.Fatalf("Unable to create docker client")
+	}
+
+	imagename := "go-test:img" //mandatory input
+	containername := "go-test" //not necessarily be taken from the user
+	portopening := "8080" //not necessarily be taken from the user
+	inputEnv := []string{fmt.Sprintf("LISTENINGPORT=%s", portopening)}
+
+	//mandatory input
+	commands := []string{"python -m ensurepip --upgrade", "pip3 freeze > requirements.txt", "pip3 install cyclonedx-bom==0.4.3 safety", "cyclonedx-py -j -o /tmp/sbom.json", "safety check -r requirements.txt --json --output /tmp/cve.json || true"}
+
+	err = ImageScanWithCustomCommands(cli, imagename, containername, portopening, inputEnv, commands)
+	if err != nil {
+		log.Println(err)
+	}
 }
