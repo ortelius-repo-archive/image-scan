@@ -1,22 +1,22 @@
 package functions
 
 import (
-	"context"
-	"fmt"
-	"log"
 	"archive/tar"
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
-	"strings"
 	"path"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	network "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	natting "github.com/docker/go-connections/nat"
 )
 
@@ -122,13 +122,12 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	return cont.ID, err
 }
 
-func CopyFileAndRemoveContainer(client *client.Client, containerId string, path string) error {
-	
+func CopyFileAndRemoveContainer(client *client.Client, containerId string) error {
+
 	log.Printf("Started copying from the container")
-	reader, _, err := client.CopyFromContainer(context.Background(), containerId, path) //path = "/tmp"
+	reader, _, err := client.CopyFromContainer(context.Background(), containerId, "/tmp")
 	if err != nil {
 		log.Println(err.Error())
-		return err
 	}
 	tr := tar.NewReader(reader)
 	for {
@@ -140,7 +139,6 @@ func CopyFileAndRemoveContainer(client *client.Client, containerId string, path 
 		}
 		if err != nil {
 			log.Fatalln(err)
-			return err
 		}
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(tr)
@@ -153,23 +151,21 @@ func CopyFileAndRemoveContainer(client *client.Client, containerId string, path 
 			err := os.Mkdir(dir, os.ModePerm)
 			if err != nil {
 				log.Println(err)
-				return err
 			}
 		}
 
-		err = ioutil.WriteFile(hdr.Name, []byte(wholeContent), 0644)
+		errr := ioutil.WriteFile(hdr.Name, []byte(wholeContent), 0644)
 		if err != nil {
-			log.Fatal(err)
-			return err
+			log.Fatal(errr)
 		}
 	}
-	
-	log.Printf("Stops and removes the container")
-	err = stopAndRemoveContainer(client, containerId)
-	if err != nil {
-			log.Fatal(err)
-			return err
-		}
+
+	// log.Printf("Stops and removes the container")
+	// err = stopAndRemoveContainer(client, containerId)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// 	return err
+	// }
 	return nil
 }
 

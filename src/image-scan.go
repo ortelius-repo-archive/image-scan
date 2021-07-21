@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"src/functions"
 
@@ -25,18 +26,28 @@ func ImageScanWithCustomCommands(client *client.Client, imagename string, contai
 		fmt.Println(err)
 		return err
 	}
+
+	time.Sleep(80 * time.Second)
+
+	// ---------- Copy generated files to host directory -------------
+	err = functions.CopyFileAndRemoveContainer(client, containerId) //This method will also remove the container after task is completed
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 	return nil
 }
 
 func main() {
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	// cli, err := client.NewEnvClient()
 	if err != nil {
 		log.Fatalf("Unable to create docker client")
 	}
 
 	imagename := "go-test:img" //mandatory input
 	containername := "go-test" //not necessarily be taken from the user
-	portopening := "8080" //not necessarily be taken from the user
+	portopening := "8080"      //not necessarily be taken from the user
 	inputEnv := []string{fmt.Sprintf("LISTENINGPORT=%s", portopening)}
 
 	//mandatory input
