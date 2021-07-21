@@ -160,12 +160,12 @@ func CopyFileAndRemoveContainer(client *client.Client, containerId string) error
 		}
 	}
 
-	// log.Printf("Stops and removes the container")
-	// err = stopAndRemoveContainer(client, containerId)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// 	return err
-	// }
+	log.Printf("Stops and removes the container")
+	err = stopAndRemoveContainer(client, containerId)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
 	return nil
 }
 
