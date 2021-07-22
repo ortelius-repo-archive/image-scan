@@ -2,9 +2,10 @@ package functions
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -105,7 +106,7 @@ func RunContainer(client *client.Client, imagename string, containername string,
 
 	// Define ports to be exposed (has to be same as hostconfig.portbindings.newport)
 	exposedPorts := map[natting.Port]struct{}{
-		newport: struct{}{},
+		newport: {},
 	}
 
 	// Configuration
@@ -138,10 +139,10 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	return cont.ID, err
 }
 
-func CopyFileAndRemoveContainer(client *client.Client, containerId string) error {
+func CopyFileAndRemoveContainer(client *client.Client, containerId string, dirToSave string) error {
 
 	log.Printf("Started copying from the container")
-	reader, _, err := client.CopyFromContainer(context.Background(), containerId, "/tmp")
+	reader, _, err := client.CopyFromContainer(context.Background(), containerId, dirToSave)
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -205,16 +206,30 @@ func stopAndRemoveContainer(client *client.Client, containerId string) error {
 	return nil
 }
 
-// Readln from bufioReader
-func Readln(r *bufio.Reader) (string, error) {
-	var (
-		isPrefix = true
-		err      error
-		line, ln []byte
-	)
-	for isPrefix && err == nil {
-		line, isPrefix, err = r.ReadLine()
-		ln = append(ln, line...)
+func PullImage(client *client.Client, username string, password string, imagePath string) error { //imagePath eg: 1645370/test-imag:latest
+
+	authConfig := types.AuthConfig{
+		Username: username,
+		Password: password,
 	}
-	return string(ln), err
+	encodedJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		return err
+	}
+	authStr := base64.URLEncoding.EncodeToString(encodedJSON)
+
+	if err != nil {
+		return err
+	}
+
+	reader, err := client.ImagePull(context.Background(), imagePath, types.ImagePullOptions{RegistryAuth: authStr})
+	if err != nil {
+		return err
+	}
+	wr, err := io.Copy(os.Stdout, reader)
+	fmt.Println(wr)
+	if err != nil {
+		return err
+	}
+	return nil
 }

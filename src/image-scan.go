@@ -6,13 +6,35 @@ import (
 
 	"src/functions"
 
+	"github.com/BurntSushi/toml"
 	"github.com/docker/docker/client"
 )
 
-func ImageScanWithCustomCommands(client *client.Client, imagename string, containername string, port string, inputEnv []string, commands []string) error {
+type Config struct {
+	Port          string
+	ContainerName string
+	UserName      string
+	Password      string
+}
+
+func ImageScanWithCustomCommands(client *client.Client, imagename string, commands []string, dirToSave string, inputEnv []string) error {
+
+	//---------- Loading configuration -------------
+	var config Config
+	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	//---------- Pulling image -------------
+	err := functions.PullImage(client, config.UserName, config.Password, imagename) //imagename is ${ImageRegistry}:${ImageTag} eg: 1645370/test-imag:latest
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
 	//---------- Start container -------------
-	containerId, err := functions.RunContainer(client, imagename, containername, port, inputEnv)
+	containerId, err := functions.RunContainer(client, imagename, config.ContainerName, config.Port, inputEnv)
 
 	if err != nil {
 		fmt.Println(err)
@@ -27,7 +49,7 @@ func ImageScanWithCustomCommands(client *client.Client, imagename string, contai
 	}
 
 	// ---------- Copy generated files to host directory -------------
-	err = functions.CopyFileAndRemoveContainer(client, containerId) //This method will also remove the container after task is completed
+	err = functions.CopyFileAndRemoveContainer(client, containerId, dirToSave) //This method will also remove the container after task is completed
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -42,15 +64,13 @@ func main() {
 		log.Fatalf("Unable to create docker client")
 	}
 
-	imagename := "go-test:img" //mandatory input
-	containername := "go-test" //not necessarily be taken from the user
-	portopening := "8080"      //not necessarily be taken from the user
-	inputEnv := []string{fmt.Sprintf("LISTENINGPORT=%s", portopening)}
+	imagename := "1645370/ortelius-test:latest"                                                                                                                                                                                                        //mandatory input
+	commands := []string{"python -m ensurepip --upgrade", "pip3 freeze > requirements.txt", "pip3 install cyclonedx-bom==0.4.3 safety", "cyclonedx-py -j -o /tmp/sbom.json", "safety check -r requirements.txt --json --output /tmp/cve.json || true"} //mandatory input
+	directoryToSaveGeneratedFiles := "/tmp"
 
-	//mandatory input
-	commands := []string{"python -m ensurepip --upgrade", "pip3 freeze > requirements.txt", "pip3 install cyclonedx-bom==0.4.3 safety", "cyclonedx-py -j -o /tmp/sbom.json", "safety check -r requirements.txt --json --output /tmp/cve.json || true"}
+	inputEnv := []string{"DB_HOST=192.168.225.51", "DB_PORT=9876"}
 
-	err = ImageScanWithCustomCommands(cli, imagename, containername, portopening, inputEnv, commands)
+	err = ImageScanWithCustomCommands(cli, imagename, commands, directoryToSaveGeneratedFiles, inputEnv)
 	if err != nil {
 		log.Println(err)
 	}
