@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"src/functions"
 
@@ -26,8 +25,6 @@ func ImageScanWithCustomCommands(client *client.Client, imagename string, contai
 		fmt.Println(err)
 		return err
 	}
-
-	time.Sleep(80 * time.Second)
 
 	// ---------- Copy generated files to host directory -------------
 	err = functions.CopyFileAndRemoveContainer(client, containerId) //This method will also remove the container after task is completed

@@ -2,6 +2,7 @@ package functions
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -27,24 +29,38 @@ func ExecCommand(client *client.Client, containerId string, commands []string) e
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          []string{"sh", "-c", createdExcComand},
-		Privileged:   true,
-		WorkingDir:   "/app",
+		Tty:          false,
+		Detach:       false,
 	}
 	execID, _ := client.ContainerExecCreate(context.Background(), containerId, c)
 	fmt.Println(execID)
 
-	res, err := client.ContainerExecAttach(context.Background(), execID.ID, types.ExecStartCheck{})
+	res, err := client.ContainerExecAttach(context.Background(), execID.ID, types.ExecStartCheck{
+		Detach: false,
+		Tty:    false,
+	})
 	if err != nil {
 		return err
 	}
+	defer res.Close()
 
 	err = client.ContainerExecStart(context.Background(), execID.ID, types.ExecStartCheck{})
 	if err != nil {
 		return err
 	}
 
-	content, _, _ := res.Reader.ReadLine()
-	fmt.Println(string(content))
+	run := true
+	for run {
+		resp, err := client.ContainerExecInspect(context.Background(), execID.ID)
+		if err != nil {
+			panic(err)
+		}
+
+		if !resp.Running {
+			run = false
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 
 	return nil
 }
@@ -187,4 +203,18 @@ func stopAndRemoveContainer(client *client.Client, containerId string) error {
 		return err
 	}
 	return nil
+}
+
+// Readln from bufioReader
+func Readln(r *bufio.Reader) (string, error) {
+	var (
+		isPrefix = true
+		err      error
+		line, ln []byte
+	)
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.ReadLine()
+		ln = append(ln, line...)
+	}
+	return string(ln), err
 }
