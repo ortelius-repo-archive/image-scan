@@ -18,9 +18,9 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	network "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	natting "github.com/docker/go-connections/nat"
+	"github.com/docker/go-connections/nat"
 )
 
 func ExecCommand(client *client.Client, containerId string, commands []string) error {
@@ -68,17 +68,16 @@ func ExecCommand(client *client.Client, containerId string, commands []string) e
 
 func RunContainer(client *client.Client, imagename string, containername string, port string, inputEnv []string) (string, error) {
 	// Define a PORT opening
-	newport, err := natting.NewPort("tcp", port)
+	newport, err := nat.NewPort("tcp", port)
 	if err != nil {
 		fmt.Println("Unable to create docker port")
 		return "", err
 	}
 
 	// Configured hostConfig:
-	// https://godoc.org/github.com/docker/docker/api/types/container#HostConfig
 	hostConfig := &container.HostConfig{
-		PortBindings: natting.PortMap{
-			newport: []natting.PortBinding{
+		PortBindings: nat.PortMap{
+			newport: []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
 					HostPort: port,
@@ -94,8 +93,7 @@ func RunContainer(client *client.Client, imagename string, containername string,
 		},
 	}
 
-	// Define Network config (why isn't PORT in here...?:
-	// https://godoc.org/github.com/docker/docker/api/types/network#NetworkingConfig
+	// Define Network config
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{},
 	}
@@ -105,15 +103,14 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	networkConfig.EndpointsConfig["bridge"] = gatewayConfig
 
 	// Define ports to be exposed (has to be same as hostconfig.portbindings.newport)
-	exposedPorts := map[natting.Port]struct{}{
+	exposedPorts := map[nat.Port]struct{}{
 		newport: {},
 	}
 
 	// Configuration
-	// https://godoc.org/github.com/docker/docker/api/types/container#Config
 	config := &container.Config{
 		Image:        imagename,
-		Env:          []string{"DB_HOST=192.168.225.51", "DB_PORT=9876"},
+		Env:          inputEnv,
 		ExposedPorts: exposedPorts,
 		Hostname:     fmt.Sprintf("%s-hostnameexample", imagename),
 	}
@@ -139,7 +136,7 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	return cont.ID, err
 }
 
-func CopyFileAndRemoveContainer(client *client.Client, containerId string, dirToSave string) error {
+func CopyGeneratedFile(client *client.Client, containerId string, dirToSave string) error {
 
 	log.Printf("Started copying from the container")
 	reader, _, err := client.CopyFromContainer(context.Background(), containerId, dirToSave)
@@ -155,7 +152,7 @@ func CopyFileAndRemoveContainer(client *client.Client, containerId string, dirTo
 			break
 		}
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 		}
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(tr)
@@ -173,20 +170,15 @@ func CopyFileAndRemoveContainer(client *client.Client, containerId string, dirTo
 
 		errr := ioutil.WriteFile(hdr.Name, []byte(wholeContent), 0644)
 		if err != nil {
-			log.Fatal(errr)
+			log.Println(errr)
 		}
-	}
-
-	log.Printf("Stops and removes the container")
-	err = stopAndRemoveContainer(client, containerId)
-	if err != nil {
-		log.Fatal(err)
-		return err
 	}
 	return nil
 }
 
-func stopAndRemoveContainer(client *client.Client, containerId string) error {
+func StopAndRemoveContainer(client *client.Client, containerId string) error {
+
+	log.Printf("Cleaning up resources created")
 	ctx := context.Background()
 
 	if err := client.ContainerStop(ctx, containerId, nil); err != nil {
