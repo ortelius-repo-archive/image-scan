@@ -1,4 +1,4 @@
-module github.com/codeWithUtkarsh/image-scan/tree/main/src
+module github.com/codeWithUtkarsh/image-scan
 
 go 1.16
 
