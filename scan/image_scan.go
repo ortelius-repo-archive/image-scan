@@ -2,7 +2,7 @@ package scan
 
 import (
 	"fmt"
-	"image-scan/functions"
+	"github.com/codeWithUtkarsh/image-scan/functions"
 
 	"github.com/BurntSushi/toml"
 	"github.com/docker/docker/client"
