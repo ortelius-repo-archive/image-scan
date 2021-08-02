@@ -1,4 +1,4 @@
-package scan
+package main
 
 import (
 	"os"
@@ -35,10 +35,10 @@ func TestPositiveCase(t *testing.T) {
 		t.Errorf("Required file not generated")
 	}
 
-	err = os.RemoveAll("tmp/")
-	if err != nil {
-		t.Errorf("Cleaning of the generated files failed")
-	}
+	// err = os.RemoveAll("tmp/")
+	// if err != nil {
+	// 	t.Errorf("Cleaning of the generated files failed")
+	// }
 }
 
 //negative test cases
