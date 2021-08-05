@@ -19,56 +19,14 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
 
-func ExecCommand(client *client.Client, containerId string, commands []string) error {
-
-	createdExcComand := strings.Join(commands, " && ")
-	c := types.ExecConfig{
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd:          []string{"sh", "-c", createdExcComand},
-		Tty:          false,
-		Detach:       false,
-	}
-	execID, _ := client.ContainerExecCreate(context.Background(), containerId, c)
-	fmt.Println(execID)
-
-	res, err := client.ContainerExecAttach(context.Background(), execID.ID, types.ExecStartCheck{
-		Detach: false,
-		Tty:    false,
-	})
-	if err != nil {
-		return err
-	}
-	defer res.Close()
-
-	err = client.ContainerExecStart(context.Background(), execID.ID, types.ExecStartCheck{})
-	if err != nil {
-		return err
-	}
-
-	run := true
-	for run {
-		resp, err := client.ContainerExecInspect(context.Background(), execID.ID)
-		if err != nil {
-			panic(err)
-		}
-
-		if !resp.Running {
-			run = false
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	return nil
-}
-
-func RunContainer(client *client.Client, imagename string, containername string, port string, inputEnv []string) (string, error) {
+func RunContainer(client *client.Client, imagename string, containername string, port string, inputEnv []string, commands []string) (string, error) {
 	// Define a PORT opening
-	newport, err := nat.NewPort("tcp", port)
+	newport, err := nat.NewPort("tcp", "80")
 	if err != nil {
 		fmt.Println("Unable to create docker port")
 		return "", err
@@ -77,15 +35,10 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	// Configured hostConfig:
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
-			newport: []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: port,
-				},
-			},
+			newport: []nat.PortBinding{},
 		},
 		RestartPolicy: container.RestartPolicy{
-			Name: "always",
+			Name: "no",
 		},
 		LogConfig: container.LogConfig{
 			Type:   "json-file",
@@ -108,20 +61,20 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	}
 
 	// Configuration
+	createdExcComand := strings.Join(commands, " && ")
+	expectedEntrypoint := strslice.StrSlice(append([]string{"/bin/sh"}, "-c", createdExcComand))
 	config := &container.Config{
 		Image:        imagename,
 		Env:          inputEnv,
 		ExposedPorts: exposedPorts,
-		Hostname:     fmt.Sprintf("%s-hostnameexample", imagename),
+		Entrypoint:   expectedEntrypoint,
 	}
 
-	// Creating the actual container. This is "nil,nil,nil" in every example.
 	cont, err := client.ContainerCreate(
 		context.Background(),
 		config,
 		hostConfig,
 		networkConfig,
-		nil,
 		containername,
 	)
 
@@ -131,8 +84,27 @@ func RunContainer(client *client.Client, imagename string, containername string,
 	}
 
 	// Run the actual container
-	client.ContainerStart(context.Background(), cont.ID, types.ContainerStartOptions{})
-	log.Printf("Container %s is created", cont.ID)
+	err = client.ContainerStart(context.Background(), cont.ID, types.ContainerStartOptions{})
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	log.Printf("Container %s has started", cont.ID)
+
+	run := true
+	for run {
+		resp, err := client.ContainerInspect(context.Background(), cont.ID)
+		if err != nil {
+			panic(err)
+		}
+
+		if !resp.State.Running {
+			run = false
+		}
+//		log.Printf("Container %s still executing commands", cont.ID)
+		time.Sleep(250 * time.Millisecond)
+	}
+
 	return cont.ID, err
 }
 
