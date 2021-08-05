@@ -1,4 +1,4 @@
-package main
+package scan
 
 import (
 	"os"
@@ -18,9 +18,15 @@ func TestPositiveCase(t *testing.T) {
 	commands := []string{"python -m ensurepip --upgrade", "pip3 freeze > requirements.txt", "pip3 install cyclonedx-bom==0.4.3 safety", "cyclonedx-py -j -o /tmp/sbom.json", "safety check -r requirements.txt --json --output /tmp/cve.json || true"} //mandatory input
 	directoryToSaveGeneratedFiles := "/tmp"
 
-	inputEnv := []string{"DB_HOST=192.168.225.51", "DB_PORT=9876"}
+	inputEnv := []string{}
 
-	err = ImageScanWithCustomCommands(cli, imagename, commands, directoryToSaveGeneratedFiles, inputEnv)
+	var config Config
+	config.UserName = "1645370"
+	config.Password = "Tyrion@11"
+	config.Port = "5000"
+	config.ContainerName = "tmp_cont"
+
+	err = ImageScanWithCustomCommands(cli, imagename, commands, directoryToSaveGeneratedFiles, inputEnv, config)
 	if err != nil {
 		t.Errorf("Error occured while ImageScanWithCustomCommands(); err= %s", err)
 	}
@@ -35,14 +41,13 @@ func TestPositiveCase(t *testing.T) {
 		t.Errorf("Required file not generated")
 	}
 
-	// err = os.RemoveAll("tmp/")
-	// if err != nil {
-	// 	t.Errorf("Cleaning of the generated files failed")
-	// }
+	err = os.RemoveAll("tmp/")
+	if err != nil {
+		t.Errorf("Cleaning of the generated files failed")
+	}
 }
 
 //negative test cases
-
 func TestImageNotFound(t *testing.T) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	// cli, err := client.NewEnvClient()
@@ -54,10 +59,15 @@ func TestImageNotFound(t *testing.T) {
 	commands := []string{"python -m ensurepip --upgrade", "pip3 freeze > requirements.txt", "pip3 install cyclonedx-bom==0.4.3 safety", "cyclonedx-py -j -o /tmp/sbom.json", "safety check -r requirements.txt --json --output /tmp/cve.json || true"} //mandatory input
 	directoryToSaveGeneratedFiles := "/tmp"
 
-	inputEnv := []string{"DB_HOST=192.168.225.51", "DB_PORT=9876"}
+	inputEnv := []string{}
 
-	err = ImageScanWithCustomCommands(cli, imagename, commands, directoryToSaveGeneratedFiles, inputEnv)
+	var config Config
+	config.UserName = "1645370"
+	config.Password = "Tyrion@11"
+	config.Port = "5000"
+	config.ContainerName = "tmp_cont"
 
+	err = ImageScanWithCustomCommands(cli, imagename, commands, directoryToSaveGeneratedFiles, inputEnv, config)
 	if err == nil {
 		t.Errorf("Error excpected but found nil")
 	}
